@@ -1,0 +1,286 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               Int               @id @default(autoincrement())
+  email            String?           @unique
+  phone            String            @unique @db.VarChar(10)
+  password         String
+  name             String            @db.VarChar(128)
+  surname          String            @db.VarChar(128)
+  middle_name      String?           @db.VarChar(128)
+  personnel_number Int?
+  status           UserStatus        @default(WORKING)
+  created_at       DateTime          @default(now())
+  updated_at       DateTime          @updatedAt
+  deleted          DateTime?
+  VerificationCode VerificationCode?
+  roles            Role[]
+  company          Company?          @relation(fields: [company_id], references: [id])
+  company_id       Int?
+  action_logs      ActionLog[]
+
+  @@map("users")
+}
+
+model VerificationCode {
+  id         Int      @id @default(autoincrement())
+  User       User     @relation(fields: [user_id], references: [id])
+  user_id    Int      @unique
+  code       Int
+  secret     String   @db.VarChar(30)
+  created_at DateTime @default(now())
+  expires_at DateTime
+
+  @@map("verification_codes")
+}
+
+model PermissionGroup {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  permissions Permission[]
+
+  @@map("permission_groups")
+}
+
+model Permission {
+  id                  Int             @id @default(autoincrement())
+  name                String          @unique
+  description         String
+  permission_group_id Int
+  created_at          DateTime        @default(now())
+  updated_at          DateTime        @updatedAt
+  PermissionGroup     PermissionGroup @relation(fields: [permission_group_id], references: [id])
+  roles               Role[]
+
+  @@map("permissions")
+}
+
+model Role {
+  id          Int          @id @default(autoincrement())
+  name        String
+  type        RoleTypes
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @updatedAt
+  permissions Permission[]
+  users       User[]
+
+  @@map("roles")
+}
+
+model Company {
+  id            Int             @id @default(autoincrement())
+  name          String          @unique
+  divisions     Int[]
+  created_at    DateTime        @default(now())
+  updated_at    DateTime        @updatedAt
+  users         User[]
+  TransportUnit TransportUnit[]
+
+  @@map("companies")
+}
+
+model ActionLog {
+  id         Int      @id @default(autoincrement())
+  action     String
+  user_id    Int
+  User       User     @relation(fields: [user_id], references: [id])
+  data       Json
+  entity     String
+  entity_id  Int?
+  created_at DateTime @default(now())
+
+  @@map("action_logs")
+}
+
+model Citizen {
+  id               Int        @id @default(autoincrement())
+  xo_id            Int?       @unique
+  email            String?    @db.VarChar(100)
+  questionnaire_id Int?       @unique
+  card_type        String?    @db.VarChar(30)
+  card_type_code   String?    @db.VarChar(30)
+  card_code        String?    @db.VarChar(100)
+  card_cover_url   String?    @db.VarChar(200)
+  institution_name String?    @db.VarChar(200)
+  benefit_code     String?    @db.VarChar(10)
+  benefit_name     String?    @db.VarChar(200)
+  work_place       String?    @db.VarChar(150)
+  position_name    String?    @db.VarChar(100)
+  parent_id        Int?
+  parent           Citizen?   @relation("ParentChildren", fields: [parent_id], references: [id])
+  children         Citizen[]  @relation("ParentChildren")
+  privilege_id     Int?
+  privilege        Privilege? @relation(fields: [privilege_id], references: [id])
+  created_at       DateTime   @default(now())
+  updated_at       DateTime   @updatedAt
+
+  @@index([xo_id])
+  @@index([questionnaire_id])
+  @@index([parent_id])
+  @@index([privilege_id])
+  @@map("citizens")
+}
+
+model ExternalAgent {
+  id         Int      @id @default(autoincrement())
+  name       String   @unique @db.VarChar(100)
+  api_token  String   @unique @db.VarChar(32)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([name])
+  @@map("external_agents")
+}
+
+model Handbook {
+  id         Int      @id @default(autoincrement())
+  key        String   @db.VarChar(50)
+  category   String   @db.VarChar(50)
+  value      String   @db.VarChar(255)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@unique([key, category])
+  @@map("handbooks")
+}
+
+model Glossary {
+  id                  Int             @id @default(autoincrement())
+  category            String          @db.VarChar(50)
+  value               String          @db.VarChar(255)
+  additional_field    String?         @db.VarChar(255)
+  created_at          DateTime        @default(now())
+  updated_at          DateTime        @updatedAt
+  price_routes        Route[]         @relation("price_glossary_route")
+  transport_routes    Route[]         @relation("transport_glossary_route")
+  privilege_types     Privilege[]     @relation("privilege_type_glossary")
+  privilege_factories Privilege[]     @relation("privilege_factory_glossary")
+  privilege_positions Privilege[]     @relation("privilege_position_glossary")
+  TransportUnit       TransportUnit[]
+
+  @@unique([category, value])
+  @@map("glossaries")
+}
+
+model Page {
+  id         Int      @id @default(autoincrement())
+  key        String   @unique @db.VarChar(30)
+  name       String   @db.VarChar(200)
+  file_name  String?  @db.VarChar(100)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([key])
+  @@map("pages")
+}
+
+model Route {
+  id                Int         @id @default(autoincrement())
+  number            String      @db.VarChar(10)
+  name              String      @db.VarChar(200)
+  transport_type_id Int
+  transport_type    Glossary    @relation("transport_glossary_route", fields: [transport_type_id], references: [id], onDelete: Cascade)
+  ticket_price_id   Int
+  ticket_price      Glossary    @relation("price_glossary_route", fields: [ticket_price_id], references: [id], onDelete: Cascade)
+  ticket_duration   Int
+  forward_geo_path  String      @db.Text
+  backward_geo_path String      @db.Text
+  forward_stops     RouteStop[] @relation("forward_stop")
+  backward_stops    RouteStop[] @relation("backward_stop")
+  created_at        DateTime    @default(now())
+  updated_at        DateTime    @updatedAt
+
+  @@unique([number, transport_type_id])
+  @@index([transport_type_id])
+  @@index([ticket_price_id])
+  @@map("routes")
+}
+
+model RouteStop {
+  id                Int      @id @default(autoincrement())
+  order             Int
+  name              String   @db.VarChar(200)
+  x                 String
+  y                 String
+  forward_route_id  Int?
+  backward_route_id Int?
+  forward_route     Route?   @relation("forward_stop", fields: [forward_route_id], references: [id], onDelete: Cascade)
+  beckward_route    Route?   @relation("backward_stop", fields: [backward_route_id], references: [id], onDelete: Cascade)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  @@index([forward_route_id])
+  @@index([backward_route_id])
+  @@map("route_stops")
+}
+
+model Privilege {
+  id                 Int            @id @default(autoincrement())
+  code               String?        @unique @db.VarChar(10)
+  name               String         @db.VarChar(400)
+  key                String?        @db.VarChar(30)
+  type_id            Int
+  type               Glossary?      @relation("privilege_type_glossary", fields: [type_id], references: [id])
+  citizens           Citizen[]
+  privilege_group_id Int
+  privilege_group    PrivilegeGroup @relation(fields: [privilege_group_id], references: [id])
+  factory_id         Int?
+  factory            Glossary?      @relation("privilege_factory_glossary", fields: [factory_id], references: [id])
+  positions          Glossary[]     @relation("privilege_position_glossary")
+  created_at         DateTime       @default(now())
+  updated_at         DateTime       @updatedAt
+
+  @@index([privilege_group_id])
+  @@index([type_id])
+  @@index([factory_id])
+  @@map("privileges")
+}
+
+model PrivilegeGroup {
+  id         Int         @id @default(autoincrement())
+  name       String      @db.VarChar(400)
+  limit      Int
+  percent    Int
+  privileges Privilege[]
+  start_date DateTime
+  end_date   DateTime
+  created_at DateTime    @default(now())
+  updated_at DateTime    @updatedAt
+
+  @@map("privilege_groups")
+}
+
+model TransportUnit {
+  id         Int      @id @default(autoincrement())
+  qr_code    String   @unique @db.VarChar(12)
+  number     Int      @unique
+  type_id    Int
+  type       Glossary @relation(fields: [type_id], references: [id])
+  brand      String   @db.VarChar(128)
+  model      String   @db.VarChar(128)
+  company_id Int
+  company    Company  @relation(fields: [company_id], references: [id])
+  division   Int
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("transport_units")
+}
+
+enum UserStatus {
+  WORKING
+  NOT_WORKING
+  TEMPORARILY_NOT_WORKING
+}
+
+enum RoleTypes {
+  WEB_PORTAL
+  MOBILE_APP
+}
